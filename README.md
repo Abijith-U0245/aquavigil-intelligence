@@ -1,73 +1,51 @@
-# Welcome to your Lovable project
+## AquaVigil – AI Pharmaceutical Pollution Intelligence
 
-## Project info
+AquaVigil is an AI-powered decision support tool for assessing pharmaceutical pollution and antimicrobial resistance (AMR) risk at the district and watershed level. It combines a modern React frontend with a TypeScript/Express backend and OpenAI integration to generate structured risk intelligence and policy-ready recommendations.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+### Frontend stack
 
-## How can I edit this code?
+- **Vite + React 18 + TypeScript**
+- **React Router** for SPA routing
+- **Tailwind CSS + shadcn-ui** for design system and components
+- **Recharts** for analytics visualizations
 
-There are several ways of editing your application.
+To run the frontend:
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+cd aquavigil-intelligence
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The dev server runs on `http://localhost:8080` by default.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Backend stack
 
-**Use GitHub Codespaces**
+- **Node.js + Express + TypeScript**
+- **OpenAI GPT-4o-mini** for AI-generated analysis
+- **dotenv** for environment configuration
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The backend lives in the `backend/` folder and exposes a typed `POST /api/analyze` endpoint that:
 
-## What technologies are used for this project?
+- Validates city, pharma presence, waste score, and population density
+- Computes a deterministic 0–100 risk score and categorical risk level
+- Calls OpenAI to generate structured narrative, AMR impact, and recommendations
 
-This project is built with:
+To run the backend:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+cd backend
+npm install
+cp .env.example .env   # then edit .env with your keys
+npm run dev            # or: npm run build && npm start
+```
 
-## How can I deploy this project?
+By default the backend listens on `http://localhost:4000`.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### High-level architecture
 
-## Can I connect a custom domain to my Lovable project?
+- **Landing page** introduces AquaVigil and links into the analyzer and results dashboard.
+- **Analyzer page** collects district parameters and calls the backend `/api/analyze` endpoint.
+- **Results dashboard** renders the returned risk score, level, AI analysis, and structured recommendations using reusable visual components.
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This repository is intended for hackathon and research use; please review and harden configuration, logging, and security before production deployment.

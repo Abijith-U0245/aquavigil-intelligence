@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { FileDown, Share2, RefreshCw, AlertTriangle, Shield, Lightbulb, ScrollText, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import RiskGauge from "@/components/shared/RiskGauge";
+import type { AnalyzeResponseBody } from "@/types/api";
 
 const barData = [
   { name: "Pharma Density", value: 78 },
@@ -38,12 +39,30 @@ const policyAccordions = [
 
 const Results = () => {
   const location = useLocation();
-  const score = (location.state as any)?.score ?? 72;
-  const district = (location.state as any)?.district ?? "Patancheru, Telangana";
+  const state = location.state as { district?: string; backendResult?: AnalyzeResponseBody & { policy?: string[] } } | null;
+  const backendResult = state?.backendResult;
+  const score = backendResult?.riskScore ?? 72;
+  const district = state?.district ?? "Patancheru, Telangana (demo)";
   const [openPolicy, setOpenPolicy] = useState<number | null>(0);
 
   const priorityColor = (p: string) =>
     p === "Immediate" ? "text-destructive bg-destructive/10" : p === "Mid-term" ? "text-secondary bg-secondary/10" : "text-primary bg-primary/10";
+
+  if (!backendResult) {
+    return (
+      <main className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
+        <div className="glass-card p-8 max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold">No recent analysis found</h1>
+          <p className="text-sm text-muted-foreground">
+            Please run a district assessment first so we can display the AI-generated risk dashboard.
+          </p>
+          <Link to="/analyzer" className="btn-primary-gradient inline-flex items-center justify-center gap-2 text-sm">
+            Go to Analyzer
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen pt-24 pb-16 px-4">
@@ -57,8 +76,12 @@ const Results = () => {
         {/* Score */}
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="glass-card p-8 flex flex-col items-center mb-8">
           <RiskGauge score={score} size="lg" />
-          <p className="mt-6 text-sm text-muted-foreground text-center max-w-lg">
-            Based on multi-factor analysis of pharmaceutical manufacturing density, waste management infrastructure, population exposure, and water body proximity, this district exhibits {score >= 70 ? "elevated" : score >= 40 ? "moderate" : "low"} risk indicators for pharmaceutical pollution and associated antimicrobial resistance.
+          <p className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">
+            {backendResult?.riskLevel ?? (score >= 70 ? "High Risk" : score >= 40 ? "Moderate Risk" : "Low Risk")}
+          </p>
+          <p className="mt-4 text-sm text-muted-foreground text-center max-w-lg whitespace-pre-line">
+            {backendResult?.analysis ??
+              "Based on a multi-factor model of pharmaceutical manufacturing density, waste management infrastructure, population exposure, and water body proximity, this district exhibits indicative risk levels for pharmaceutical pollution and associated antimicrobial resistance."}
           </p>
         </motion.div>
 
@@ -70,8 +93,9 @@ const Results = () => {
               <AlertTriangle className="w-5 h-5 text-destructive" />
               <h3 className="font-semibold">Contamination Risk Analysis</h3>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              The presence of major pharmaceutical manufacturing clusters combined with inadequate effluent treatment infrastructure creates significant contamination vectors. Active pharmaceutical ingredients including fluoroquinolones and macrolides have been detected in downstream water sources at concentrations exceeding safe environmental thresholds.
+            <p className="text-sm text-muted-foreground leading-relaxed mb-3 whitespace-pre-line">
+              {backendResult?.analysis ??
+                "The combination of pharmaceutical manufacturing activity, local hydrology, and existing waste infrastructure creates potential pathways for active pharmaceutical ingredients to accumulate in surrounding water bodies and sediments, particularly downstream of discharge points."}
             </p>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">Severity: High</span>
@@ -84,8 +108,9 @@ const Results = () => {
               <Shield className="w-5 h-5 text-secondary" />
               <h3 className="font-semibold">AMR Public Health Impact</h3>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Sub-inhibitory concentrations of <span className="text-foreground font-medium">antibiotics</span> in water bodies create selection pressure for <span className="text-foreground font-medium">drug-resistant bacteria</span>. District-level hospital data shows a 23% increase in <span className="text-foreground font-medium">multi-drug resistant</span> infections over 18 months, correlating with pharmaceutical discharge patterns upstream.
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+              {backendResult?.amrImpact ??
+                "Persistent low-level antibiotic exposure in surface and groundwater can drive the selection of drug-resistant bacteria. Over time, this may manifest as higher rates of multidrug-resistant infections in local health facilities and communities, particularly where surveillance and stewardship programs are limited."}
             </p>
           </motion.div>
 
@@ -96,12 +121,16 @@ const Results = () => {
               <h3 className="font-semibold">Recommended Interventions</h3>
             </div>
             <ul className="space-y-3">
-              {interventions.map((item, i) => (
+              {(backendResult?.recommendations ?? interventions.map((i) => i.text)).map((text, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap mt-0.5 ${priorityColor(item.priority)}`}>
-                    {item.priority}
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap mt-0.5 ${priorityColor(
+                      i <= 1 ? "Immediate" : i <= 3 ? "Mid-term" : "Long-term",
+                    )}`}
+                  >
+                    {i <= 1 ? "Immediate" : i <= 3 ? "Mid-term" : "Long-term"}
                   </span>
-                  <span className="text-muted-foreground">{item.text}</span>
+                  <span className="text-muted-foreground">{text}</span>
                 </li>
               ))}
             </ul>
@@ -114,13 +143,13 @@ const Results = () => {
               <h3 className="font-semibold">Policy Strategy Insights</h3>
             </div>
             <div className="space-y-2">
-              {policyAccordions.map((item, i) => (
+              {(backendResult?.policySuggestions ?? backendResult?.policy ?? policyAccordions.map((p) => p.content)).map((content, i) => (
                 <div key={i} className="border border-border/30 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setOpenPolicy(openPolicy === i ? null : i)}
                     className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/30 transition-colors"
                   >
-                    {item.title}
+                    {policyAccordions[i]?.title ?? `Policy Theme ${i + 1}`}
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${openPolicy === i ? "rotate-180" : ""}`} />
                   </button>
                   {openPolicy === i && (
@@ -129,7 +158,7 @@ const Results = () => {
                       animate={{ opacity: 1, height: "auto" }}
                       className="px-4 pb-3 text-xs text-muted-foreground leading-relaxed"
                     >
-                      {item.content}
+                      {content}
                     </motion.div>
                   )}
                 </div>

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { MapPin, Factory, Gauge, Users, Droplets, Loader2, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import RiskGauge from "@/components/shared/RiskGauge";
+import type { AnalyzeResponseBody } from "@/types/api";
 
 const densityOptions = ["Low", "Medium", "High", "Very High"];
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
 const Analyzer = () => {
   const navigate = useNavigate();
@@ -16,6 +19,8 @@ const Analyzer = () => {
     waterProximity: true,
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Live risk preview calculation
   const presenceWeight = form.pharmaPresence === "high" ? 30 : form.pharmaPresence === "moderate" ? 18 : 8;
@@ -24,12 +29,95 @@ const Analyzer = () => {
   const waterWeight = form.waterProximity ? 12 : 0;
   const liveScore = Math.min(100, Math.round(presenceWeight + wasteWeight + densityWeight + waterWeight + 10));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    setError(null);
     setLoading(true);
-    setTimeout(() => {
-      navigate("/results", { state: { score: liveScore, district: form.district || "Sample District" } });
-    }, 2000);
+
+    // Cancel any in-flight request
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      // Backend expects wasteScore on a 1–5 scale; map 0–100 slider into 1–5 buckets.
+      const normalizedWasteScore = Math.max(1, Math.min(5, Math.round((form.wasteScore / 100) * 5) || 1));
+
+      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          city: form.district || "Sample District",
+          pharmaPresence: form.pharmaPresence,
+          wasteScore: normalizedWasteScore,
+          populationDensity: form.density.toLowerCase().includes("high")
+            ? "high"
+            : form.density.toLowerCase().includes("low")
+              ? "low"
+              : "medium",
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let message = `Request failed with status ${response.status}`;
+        try {
+          const json = await response.json();
+          if (json?.error?.message) {
+            message = json.error.message;
+          }
+          if (Array.isArray(json?.error?.details) && json.error.details.length > 0) {
+            message = json.error.details.join("; ");
+          }
+        } catch {
+          const text = await response.text().catch(() => "");
+          if (text) message = text;
+        }
+
+        if (response.status === 400) {
+          throw new Error(`Validation error: ${message}`);
+        }
+        throw new Error(message);
+      }
+
+      const data: AnalyzeResponseBody = await response.json();
+
+      navigate("/results", {
+        state: {
+          district: form.district || "Sample District",
+          backendResult: data,
+        },
+      });
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        // Swallow abort errors
+        return;
+      }
+      console.error("Failed to analyze risk:", e);
+      if (e instanceof Error) {
+        if (e.message.startsWith("Validation error:")) {
+          setError(e.message);
+        } else {
+          setError("Unable to complete AI analysis. Please try again.");
+        }
+      } else {
+        setError("Unexpected error. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
+  }, []);
 
   return (
     <main className="min-h-screen pt-24 pb-16 px-4">
@@ -148,6 +236,11 @@ const Analyzer = () => {
                   <>Generate Risk Assessment <ArrowRight className="w-4 h-4" /></>
                 )}
               </button>
+              {error && (
+                <p className="text-xs text-destructive mt-2 text-center">
+                  {error}
+                </p>
+              )}
             </div>
           </motion.div>
 
